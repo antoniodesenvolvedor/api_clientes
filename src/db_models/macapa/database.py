@@ -1,8 +1,7 @@
 from sqlalchemy import create_engine
 from sqlalchemy.orm import scoped_session, sessionmaker
 from sqlalchemy.ext.declarative import declarative_base
-import os
-from src.config import CONNECTION_STRING_MYSQL, CONNECTION_STRING_MYSQL_DEV, PRODUCTION
+from src.server.config import CONNECTION_STRING_MYSQL, CONNECTION_STRING_MYSQL_DEV, PRODUCTION
 
 
 class DatabaseMacapa:
