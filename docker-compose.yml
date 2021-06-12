@@ -3,20 +3,67 @@ version: '3:9'
 services:
   mysql:
     image: mysql
+    container_name: mysql_mercafacil
+    restart: always
+    volumes:
+      - mysql_mercafacil:/var/lib/mysql
     environment:
-    - MYSQL_ROOT_PASSWORD=admin
-    - MYSQL_DATABASE=admin
-    - MYSQL_USER=admin
-    - MYSQL_PASSWORD=admin
-    - MYSQL_ROOT_HOST=%
+    - MYSQL_ROOT_PASSWORD=$MYSQL_ROOT_PASSWORD
+    - MYSQL_DATABASE=$MYSQL_DATABASE
+    - MYSQL_USER=$MYSQL_USER
+    - MYSQL_PASSWORD=$MYSQL_PASSWORD
+    - MYSQL_ROOT_HOST=$MYSQL_ROOT_HOST
+    - TZ=$TZ
     ports:
-      - "3306:3306"
+      - "${MYSQL_PORT}:3306"
     command: --default-authentication-plugin=mysql_native_password
+    healthcheck:
+      test: [ "CMD", "mysqladmin" ,"ping", "-h", "localhost" ]
+      interval: 10s
+      timeout: 20s
+      retries: 10
+    network:
+      - mercafacil
 
   postgresql:
     image: postgres
+    container_name: postgres_mercafacil
+    restart: always
+    volumes:
+      - postgres_mercafacil:/var/lib/postgresql/data
     ports:
-      - "5432:5432"
+      - $POSTGRES_PORT:5432
     environment:
-      POSTGRES_PASSWORD: "admin"
-      POSTGRES_USER: "admin"
+      - TZ=$TZ
+      - POSTGRES_USER=$POSTGRES_USER
+      - POSTGRES_PASSWORD=$POSTGRES_PASSWORD
+      - POSTGRES_DB=$POSTGRES_DB
+    healthcheck:
+        test: [ "CMD-SHELL", "pg_isready -U postgres" ]
+        interval: 10s
+        timeout: 5s
+        retries: 5
+    networks:
+        - mercafacil
+
+  contacts_api:
+    build: .
+    container_name: contacts_api
+    restart: always
+    ports:
+      - "${FLASK_PORT}:5000"
+    env_file:
+      - .env
+    networks:
+      - mercafacil
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mysql:
+        condition: service_started
+
+networks:
+  mercafacil:
+volumes:
+  postgres_mercafacil:
+  mysql_mercafacil:

@@ -6,7 +6,7 @@ COPY requirements.txt requirements.txt
 RUN pip install -r requirements.txt
 
 COPY src src
-WORKDIR src/
+COPY main.py main.py
 
 CMD ["python","-u" ,"./main.py"]
 
