@@ -3,7 +3,7 @@ from flask import request
 import jwt
 from src.server.config import TOKEN_KEY
 from werkzeug.security import check_password_hash
-from src.utils.utils import return_message
+from src.utils.utils import message_dict
 
 def token_required(UserModel):
     def decorator(f):
@@ -14,15 +14,18 @@ def token_required(UserModel):
             if 'Token' in request.headers:
                 token = request.headers['Token']
             if not token:
-                return return_message('Token is missing !!'), 401
+                return message_dict('É necessário informar o token !!'), 401
 
             try:
                 data = jwt.decode(token, TOKEN_KEY, algorithms=["HS256"])
-                UserModel.query \
+                user = UserModel.query \
                     .filter_by(public_id=data['public_id']) \
                     .first()
+
+                if not user:
+                    return message_dict('Token inválido!!'), 401
             except Exception:
-                return return_message('Token is invalid !!'), 401
+                return message_dict('Token inválido !!'), 401
             return f(*args, **kwargs)
         return decorated
     return decorator
@@ -30,25 +33,38 @@ def token_required(UserModel):
 
 
 
-def login_auth(UserModel):
+def basic_auth(UserModel):
     def decorator(f):
         @wraps(f)
         def decorated(*args, **kwargs):
             try:
-                payload = request.json
-            except:
-                return return_message('É necessário importar uma payload válida'), 400
+                if not request.authorization:
+                    raise ValueError("É necessário informar uma basic auth")
 
-            if not payload or not payload.get('email') or not payload.get('password'):
-                return return_message('É necessário informar os parâmetros email e password no payload'), 401
+                email = request.authorization.username
+                password = request.authorization.password
+                email_body = request.json.get('email')
 
-            user = UserModel.query.filter_by(email=payload.get('email')).first()
+                if not email or not password:
+                    raise ValueError("É necessário informar uma basic auth")
+                if not email_body:
+                    raise ValueError("É necessário informar o e-mail no payload")
+
+            except ValueError as error:
+                return message_dict(str(error)), 401
+            except Exception as e:
+                return message_dict(str(e)), 500
+
+            if email != email_body:
+                return message_dict('O email da autenticação dever ser o mesmo da operação'), 401
+
+            user = UserModel.query.filter_by(email=email).first()
 
             if not user:
-                return return_message('email ou senha inválidos'), 401,
+                return message_dict('email ou senha inválidos'), 401,
 
-            if not check_password_hash(user.password, payload.get('password')):
-                return return_message('email ou senha inválidos'), 401
+            if not check_password_hash(user.password, password):
+                return message_dict('email ou senha inválidos'), 401
 
             return f(*args, **kwargs)
         return decorated

@@ -14,6 +14,11 @@ class Server:
                 'type': 'apiKey',
                 'in': 'header',
                 'name': 'Token'
+            },
+            'basic_auth': {
+                'type': 'basic',
+                'in': 'header',
+                'name': 'Authorization'
             }
         }
         self.api = Api(

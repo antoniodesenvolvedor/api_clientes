@@ -1,2 +1,2 @@
-def return_message(message: str) -> str:
+def message_dict(message: str) -> str:
     return {"message": message}
