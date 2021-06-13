@@ -1,8 +1,9 @@
 import pytest
 import json
 from base64 import b64encode
+
+from src.controllers import contacts_macapa
 from src.server.server import server
-import src.controllers.contacts_macapa
 from tests.common_test_methods import _test_if_method_is_checking_auth, \
     _test_code_for_non_existing_resource, _test_for_validation_of_payload, _test_success_code, _test_already_exists
 import re
@@ -186,9 +187,7 @@ class TestContact:
         for index, payload_contact in enumerate(testing_contact_list['contacts']):
             assert payload_contact['name'].upper() == new_contacts[index]['name']
 
-            only_numbers_cellphone = re.sub("[^0-9]", "", payload_contact['cellphone'])
-            formatted_cellphone = f'+{only_numbers_cellphone[:2]} ({only_numbers_cellphone[2:4]}) ' \
-                                  f'{only_numbers_cellphone[4:9]}-{only_numbers_cellphone[9:]}'
+            formatted_cellphone = contacts_macapa.Contacts._format_cellphone_macapa(payload_contact['cellphone'])
             formatted_cellphone == new_contacts[index]['cellphone']
 
         return new_contacts[0]
@@ -214,9 +213,63 @@ class TestContact:
         response = test_server.get(self.url + f'?id=-9999999', headers=token_header)
         _test_code_for_non_existing_resource(response)
 
+
+
+    def _test_delete(self, server_fix, token_header, new_contact):
+        response = server_fix.delete(self.url, json=new_contact)
+        _test_if_method_is_checking_auth(response)
+
+        response = server_fix.delete(self.url, json={"id": -9999}, headers=token_header)
+        _test_code_for_non_existing_resource(response)
+
+        response = server_fix.delete(self.url, headers=token_header)
+        _test_for_validation_of_payload(response)
+
+        response = server_fix.delete(self.url, json=new_contact, headers=token_header)
+        _test_success_code(response)
+
+        response = server_fix.delete(self.url, json=new_contact, headers=token_header)
+        _test_code_for_non_existing_resource(response)
+
+    def _test_put(self, server_fix, token_header, new_contact):
+        response = server_fix.put(self.url, json=new_contact)
+        _test_if_method_is_checking_auth(response)
+
+        response = server_fix.put(self.url, headers=token_header)
+        _test_for_validation_of_payload(response)
+
+        response = server_fix.put(self.url, json={"Wrong": "parameters"}, headers=token_header)
+        _test_for_validation_of_payload(response)
+
+        response = server_fix.put(self.url, json={"id": -9999}, headers=token_header)
+        _test_code_for_non_existing_resource(response)
+
+        novos_dados = {
+            "cellphone": "5541969419199",
+            "name": "Jose",
+            "id": new_contact["id"]
+        }
+
+        response = server_fix.put(self.url, json=novos_dados, headers=token_header)
+        _test_success_code(response)
+
+        response = server_fix.get(self.url + f'?id={new_contact["id"]}', headers=token_header)
+        _test_success_code(response)
+
+        response = json.loads(response.data)
+        updated_contact_response = response['contacts'][0]
+
+        novos_dados['cellphone'] = contacts_macapa.Contacts._format_cellphone_macapa(novos_dados['cellphone'])
+        assert novos_dados['id'] == updated_contact_response["id"]
+        assert novos_dados['name'].upper() == updated_contact_response["name"]
+        assert novos_dados['cellphone'] == updated_contact_response["cellphone"]
+
     def test_contact(self, server_fix, token_header_fix, testing_contact_list_fix, testing_invalid_contact_list_fix):
         new_contact = self._test_post(server_fix, token_header_fix, testing_contact_list_fix,
                                       testing_invalid_contact_list_fix)
         self._test_get(server_fix, token_header_fix, new_contact)
+        self._test_put(server_fix, token_header_fix, new_contact)
+        self._test_delete(server_fix, token_header_fix, new_contact)
+
 
 

@@ -13,7 +13,8 @@ from src.utils.utils import message_dict
 import re
 
 
-from src.rest_models.contact_rest_model import contact_rest_model_post, contact_fields_rest_model_get
+from src.rest_models.contact_rest_model import contact_rest_model_post, contact_fields_rest_model_get, \
+    contact_rest_model_put, contact_rest_model_delete
 
 from src.rest_models.user_rest_model import user_rest_model_get, user_rest_model_post, user_rest_model_put, token_model
 
@@ -23,6 +24,15 @@ db_session = database_macapa.db_session
 
 @api.route('/macapa/contact')
 class Contacts(Resource):
+
+    @staticmethod
+    def _format_cellphone_macapa(cellphone):
+        only_numbers_cellphone = re.sub("[^0-9]", "", cellphone)
+        formatted_cellphone = f'+{only_numbers_cellphone[:2]} ({only_numbers_cellphone[2:4]}) ' \
+                              f'{only_numbers_cellphone[4:9]}-{only_numbers_cellphone[9:]}'
+        return formatted_cellphone
+
+
 
     @api.doc(params={
         'page': 'Número da página',
@@ -36,6 +46,7 @@ class Contacts(Resource):
         500: 'Internal server error'
     })
     @api.response(200, 'Success', contact_fields_rest_model_get)
+    @api.doc(security='apiKey')
     @token_required(UserMacapa)
     def get(self):
         try:
@@ -98,8 +109,7 @@ class Contacts(Resource):
                 continue
 
 
-            formatted_cellphone = f'+{only_numbers_cellphone[:2]} ({only_numbers_cellphone[2:4]}) ' \
-                                  f'{only_numbers_cellphone[4:9]}-{only_numbers_cellphone[9:]}'
+            formatted_cellphone = self._format_cellphone_macapa(only_numbers_cellphone)
             contact['cellphone'] = formatted_cellphone
 
         if validacao:
@@ -117,6 +127,74 @@ class Contacts(Resource):
             results = [{'id': contact.id, "name": contact.nome, "cellphone": contact.celular} for contact in
                        all_contacts]
             return results, 201
+        except Exception as e:
+            return message_dict(str(e)), 500
+
+
+
+
+
+    @api.doc(responses={
+        401: 'Unauthenticated',
+        400: 'Bad request',
+        404: 'Not found',
+        500: 'Internal server error',
+        200: 'Success'
+    })
+    @api.expect(contact_rest_model_put, validate=True)
+    @api.doc(security='apiKey')
+    @token_required(UserMacapa)
+    def put(self):
+
+        payload = request.json
+
+        contact_data = {}
+        contact_data['id'] = payload['id']
+        if 'name' in payload:
+            contact_data['nome'] = payload['name'].upper()
+        if 'cellphone' in payload:
+            contact_data['celular'] = self._format_cellphone_macapa(payload['cellphone'])
+
+        try:
+            statement = update(ContactsMacapa).where(ContactsMacapa.id == contact_data['id']).values(contact_data). \
+                execution_options(synchronize_session="fetch")
+
+            result = db_session.execute(statement)
+            num_rows_matched = result.rowcount
+            db_session.commit()
+
+            if num_rows_matched == 0:
+                return message_dict("Contato inexistente"), 404
+
+            return message_dict(f'Contato ID {contact_data["id"]} atualizado com sucesso'), 200
+        except Exception as e:
+            return message_dict(str(e)), 500
+
+    @api.doc(responses={
+        401: 'Unauthenticated',
+        400: 'Bad request',
+        404: 'Not found',
+        500: 'Internal server error',
+        200: 'Success'
+    })
+    @api.expect(contact_rest_model_delete, validate=True)
+    @api.doc(security='apiKey')
+    @token_required(UserMacapa)
+    def delete(self):
+
+        payload = request.json
+        try:
+            statement = delete(ContactsMacapa).where(ContactsMacapa.id == payload['id']). \
+                execution_options(synchronize_session="fetch")
+
+            result = db_session.execute(statement)
+            num_rows_matched = result.rowcount
+            db_session.commit()
+
+            if num_rows_matched == 0:
+                return message_dict(f"Contato ID: {payload['id']} não encontrado"), 404
+
+            return message_dict(f'Contato ID: {payload["id"]} apagado com sucesso'), 200
         except Exception as e:
             return message_dict(str(e)), 500
 

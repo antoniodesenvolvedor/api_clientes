@@ -9,7 +9,8 @@ from src.security.authentication import token_required, basic_auth
 from src.security.user_manager import UserManager
 from src.utils.utils import message_dict
 import re
-from src.rest_models.contact_rest_model import contact_rest_model_post, contact_fields_rest_model_get
+from src.rest_models.contact_rest_model import contact_rest_model_post, contact_fields_rest_model_get, \
+    contact_rest_model_put, contact_rest_model_delete
 from src.rest_models.user_rest_model import user_rest_model_get, user_rest_model_post, user_rest_model_put, token_model
 from math import ceil
 
@@ -19,6 +20,13 @@ db_session = database_varejao.db_session
 
 @api.route('/varejao/contact')
 class Contacts(Resource):
+
+    @staticmethod
+    def _format_cellphone_varejao(cellphone):
+        only_numbers_cellphone = re.sub("[^0-9]", "", cellphone)
+
+        return only_numbers_cellphone
+
 
     @api.doc(params={
         'page': 'Número da página',
@@ -32,6 +40,7 @@ class Contacts(Resource):
         500: 'Internal server error'
     })
     @api.response(200, 'Success', contact_fields_rest_model_get)
+    @api.doc(security='apiKey')
     @token_required(UserVarejao)
     def get(self):
         try:
@@ -85,7 +94,7 @@ class Contacts(Resource):
 
         validation = []
         for contact in contacts:
-            only_numbers_cellphone = re.sub("[^0-9]", "", contact.get('cellphone'))
+            only_numbers_cellphone = self._format_cellphone_varejao(contact.get('cellphone'))
             if len(only_numbers_cellphone) != 13:
                 validation.append(f'Formato de telefone inválido: {contact.get("cellphone")},'
                                   f'name:{contact.get("name")}')
@@ -108,6 +117,74 @@ class Contacts(Resource):
             return results, 201
         except Exception as e:
             return message_dict(str(e)), 500
+
+
+
+    @api.doc(responses={
+        401: 'Unauthenticated',
+        400: 'Bad request',
+        404: 'Not found',
+        500: 'Internal server error',
+        200: 'Success'
+    })
+    @api.expect(contact_rest_model_put, validate=True)
+    @api.doc(security='apiKey')
+    @token_required(UserVarejao)
+    def put(self):
+
+        payload = request.json
+
+        contact_data = {}
+        contact_data['id'] = payload['id']
+        if 'name' in payload:
+            contact_data['nome'] = payload['name']
+        if 'cellphone' in payload:
+            contact_data['celular'] = self._format_cellphone_varejao(payload['cellphone'])
+
+        try:
+            statement = update(ContactsVarejao).where(ContactsVarejao.id == contact_data['id']).values(contact_data). \
+                execution_options(synchronize_session="fetch")
+
+            result = db_session.execute(statement)
+            num_rows_matched = result.rowcount
+            db_session.commit()
+
+            if num_rows_matched == 0:
+                return message_dict("Contato inexistente"), 404
+
+            return message_dict(f'Contato ID {contact_data["id"]} atualizado com sucesso'), 200
+        except Exception as e:
+            return message_dict(str(e)), 500
+
+    @api.doc(responses={
+        401: 'Unauthenticated',
+        400: 'Bad request',
+        404: 'Not found',
+        500: 'Internal server error',
+        200: 'Success'
+    })
+    @api.expect(contact_rest_model_delete, validate=True)
+    @api.doc(security='apiKey')
+    @token_required(UserVarejao)
+    def delete(self):
+
+        payload = request.json
+        try:
+            statement = delete(ContactsVarejao).where(ContactsVarejao.id == payload['id']). \
+                execution_options(synchronize_session="fetch")
+
+            result = db_session.execute(statement)
+            num_rows_matched = result.rowcount
+            db_session.commit()
+
+            if num_rows_matched == 0:
+                return message_dict(f"Contato ID: {payload['id']} não encontrado"), 404
+
+            return message_dict(f'Contato ID: {payload["id"]} apagado com sucesso'), 200
+        except Exception as e:
+            return message_dict(str(e)), 500
+
+
 
 
 @api.route('/varejao/user')
