@@ -7,4 +7,5 @@ flask-restplus==0.13.0
 python-dotenv==0.17.1
 mysql-connector-python==8.0.25
 PyJWT==2.1.0
+redis==3.5.3
 

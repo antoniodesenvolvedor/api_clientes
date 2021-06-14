@@ -61,6 +61,16 @@ services:
         condition: service_healthy
       mysql_mercafacil:
         condition: service_healthy
+      redis_user_api:
+        condition: service_started
+
+  redis_contacts_api:
+    image: redis
+    restart: always
+    ports:
+      - "6379:6379"
+    networks:
+      - mercafacil
 
 networks:
   mercafacil:

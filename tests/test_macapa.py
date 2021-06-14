@@ -205,7 +205,7 @@ class TestContact:
         _test_success_code(response)
 
         response = json.loads(response.data)
-        new_contact_response = response['contacts'][0]
+        new_contact_response = response['contacts']
         assert new_contact_response['id'] == new_contact["id"]
         assert new_contact_response['name'] == new_contact["name"]
         assert new_contact_response['cellphone'] == new_contact["cellphone"]

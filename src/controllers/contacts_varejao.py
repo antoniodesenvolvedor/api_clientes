@@ -13,6 +13,8 @@ from src.rest_models.contact_rest_model import contact_rest_model_post, contact_
     contact_rest_model_put, contact_rest_model_delete
 from src.rest_models.user_rest_model import user_rest_model_get, user_rest_model_post, user_rest_model_put, token_model
 from math import ceil
+from src.server.config import USE_CACHE
+from src.cache.redis_handler import RedisHandler
 
 api = server.api
 db_session = database_varejao.db_session
@@ -26,6 +28,10 @@ class Contacts(Resource):
         only_numbers_cellphone = re.sub("[^0-9]", "", cellphone)
 
         return only_numbers_cellphone
+
+    @staticmethod
+    def _make_cache_key_for_varejao(key):
+        return f'varejao-{key}'
 
 
     @api.doc(params={
@@ -62,17 +68,37 @@ class Contacts(Resource):
             if ceil(total / per_page) < page:
                 return message_dict('Página inexistente'), 400
 
-            filtros = {}
-            if request.args.get("id"):
-                filtros['id'] = request.args.get("id")
+            cache_results = None
+            if USE_CACHE:
+                redis_handler = RedisHandler()
+                cache_key = f'per_page={per_page}page={page}' if not request.args.get("id") else request.args.get("id")
+                cache_key = self._make_cache_key_for_varejao(cache_key)
 
-            results = db_session.query(ContactsVarejao).filter_by(**filtros)\
-                .limit(per_page).offset(per_page * (page - 1)).all()
+                cache_results = redis_handler.get_value(cache_key)
+                if cache_results:
+                    cache_results = json.loads(cache_results)
 
-            if not results:
-                return message_dict("Não existe nada para listar"), 404
+            if cache_results:
+                results = cache_results
+            else:
+                filtros = {}
+                if request.args.get("id"):
+                    filtros['id'] = request.args.get("id")
 
-            results = [{'id': result.id, "name": result.nome, "cellphone": result.celular} for result in results]
+                results = db_session.query(ContactsVarejao).filter_by(**filtros)\
+                    .limit(per_page).offset(per_page * (page - 1)).all()
+
+                if not results:
+                    return message_dict("Não existe nada para listar"), 404
+
+                results = [{'id': result.id, "name": result.nome, "cellphone": result.celular} for result in results]
+
+                if USE_CACHE:
+                    cache_key = f'per_page={per_page}page={page}' if not request.args.get("id") \
+                        else request.args.get("id")
+                    cache_key = self._make_cache_key_for_varejao(cache_key)
+                    redis_handler.set_value(cache_key, json.dumps(results))
+
 
             response = {"page": page, "total": total, "results_per_page": per_page, "contacts": results}
             return response, 200
@@ -113,7 +139,15 @@ class Contacts(Resource):
         try:
             db_session.bulk_save_objects(all_contacts, return_defaults=True)
             db_session.commit()
-            results = [{'id': contact.id, "name": contact.nome, "cellphone": contact.celular} for contact in all_contacts]
+            results = [{'id': contact.id, "name": contact.nome, "cellphone": contact.celular} for contact
+                       in all_contacts]
+
+            if USE_CACHE:
+                redis_handler = RedisHandler()
+                for result in results:
+                    cache_key = self._make_cache_key_for_varejao(result['id'])
+                    redis_handler.set_value(cache_key, json.dumps(result))
+
             return results, 201
         except Exception as e:
             return message_dict(str(e)), 500
@@ -152,6 +186,11 @@ class Contacts(Resource):
             if num_rows_matched == 0:
                 return message_dict("Contato inexistente"), 404
 
+            if USE_CACHE:
+                redis_handler = RedisHandler()
+                cache_key = self._make_cache_key_for_varejao(contact_data['id'])
+                redis_handler.delete_value(cache_key)
+
             return message_dict(f'Contato ID {contact_data["id"]} atualizado com sucesso'), 200
         except Exception as e:
             return message_dict(str(e)), 500
@@ -179,6 +218,11 @@ class Contacts(Resource):
 
             if num_rows_matched == 0:
                 return message_dict(f"Contato ID: {payload['id']} não encontrado"), 404
+
+            if USE_CACHE:
+                redis_handler = RedisHandler()
+                cache_key = self._make_cache_key_for_varejao(payload['id'])
+                redis_handler.delete_value(cache_key)
 
             return message_dict(f'Contato ID: {payload["id"]} apagado com sucesso'), 200
         except Exception as e:
