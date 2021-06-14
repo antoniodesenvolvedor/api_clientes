@@ -23,6 +23,8 @@ mas essa e outras configurações podem ser alteradas no arquivo .env
 ## Iniciando a aplicação com Docker
 git clone  https://github.com/antoniodesenvolvedor/api_clientes.git 
 
+cd api_clientes
+
 docker-compose build
 
 docker-compose up -d
