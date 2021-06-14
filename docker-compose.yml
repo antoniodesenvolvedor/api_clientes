@@ -6,7 +6,7 @@ services:
     container_name: mysql_mercafacil
     restart: always
     volumes:
-      - mysql_mercafacil:/var/lib/mysql
+      - mysql_mercafacil_4:/var/lib/mysql
     environment:
     - MYSQL_ROOT_PASSWORD=$MYSQL_ROOT_PASSWORD
     - MYSQL_DATABASE=$MYSQL_DATABASE
@@ -29,7 +29,7 @@ services:
     container_name: postgres_mercafacil
     restart: always
     volumes:
-      - postgres_mercafacil:/var/lib/postgresql/data
+      - postgres_mercafacil_4:/var/lib/postgresql/data
     ports:
       - $POSTGRES_PORT:5432
     environment:
@@ -61,7 +61,7 @@ services:
         condition: service_healthy
       mysql_mercafacil:
         condition: service_healthy
-      redis_user_api:
+      redis_contacts_api:
         condition: service_started
 
   redis_contacts_api:
@@ -75,5 +75,5 @@ services:
 networks:
   mercafacil:
 volumes:
-  postgres_mercafacil:
-  mysql_mercafacil:
+  postgres_mercafacil_4:
+  mysql_mercafacil_4:
