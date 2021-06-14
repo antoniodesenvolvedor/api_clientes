@@ -64,6 +64,8 @@ em /macapa/contact ou /varejao/contact.
 
 ###### Por motivo de testes, foi disponibilizado no repositório um .env. Mas em cenários reais deixar o .env no repositório é uma má prática.
 
+Obs: Guarde a TOKEN_KEY do arquivo .env muito bem, pois ela é utilizada para gerar os tokens.
+
 
 ## Preparando o ambiente de desenvolvimento
 
